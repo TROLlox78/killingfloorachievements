@@ -1,0 +1,173 @@
+import requests
+import PySimpleGUI as sg
+from os import startfile
+
+
+def main():
+    def getname(name):
+        if name.isnumeric():
+            try:
+                response = requests.get(f'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=DE8E5BFADA71FD0CD54EEC2CCB796E1E&steamids={name}')
+                dictonary = response.json()['response']['players'][0]
+                return dictonary['personaname']
+            except IndexError:
+                return name
+        else:
+            return name
+
+    def the_the(name):
+        if name.isnumeric():
+            x = requests.get(f'https://steamcommunity.com/profiles/{name}/stats/KillingFloor')
+        else:
+            x = requests.get(f'https://steamcommunity.com/id/{name}/stats/KillingFloor')
+
+        count = 0
+        with open('source.txt','w',encoding='utf-8') as file:
+            file.write(x.text)
+        file = open('source.txt', 'r', encoding="utf-8")
+        write_to = open('achievements.txt', 'w', encoding='utf-8')
+        write_to.write(f'{getname(name).capitalize()}\n')
+
+        normallong = []
+        normalshort = []
+        hardshort = []
+        hardlong = []
+        suicidelong = []
+        suicideshort = []
+        hoeshort = []
+        hoelong = []
+        search = '\t\t\t\t\t\t<h3 class="ellipsis">'
+        disc = '<h5 class="ellipsis">'
+        diff_normal = 'on Normal Difficulty'
+        diff_hard = 'on Hard Difficulty'
+        diff_suicide = 'on Suicidal Difficulty'
+        diff_hoe = 'on Hell'
+        length_long = 'Win a Long Game'
+        length_short = 'Beat '
+        while x != '':
+            x = file.readline()
+            # FIND ACHIEVEMENT
+            if search in x:
+                # SEARCH FOR DESC OF ACHIEVEMENT
+                achiname = x[27:-6]
+                for i in range(0, 8):
+                    newline = file.readline()
+                    if disc in newline:
+                        if diff_normal in newline:
+                            if length_short in newline:
+                                normalshort.append(newline[32:-27].strip(','))
+                            if length_long in newline:
+                                normallong.append(newline[46:-28].strip(','))
+                        elif diff_hard in newline:
+                            if length_short in newline:
+                                hardshort.append(newline[32:-25].strip(','))
+                            if length_long in newline:
+                                hardlong.append(newline[46:-26].strip(','))
+                        elif diff_suicide in newline:
+                            if length_short in newline:
+                                suicideshort.append(newline[32:-29].strip(','))
+                            if length_long in newline:
+                                suicidelong.append(newline[46:-30].strip(','))
+                        elif diff_hoe in newline:
+                            if length_short in newline:
+                                hoeshort.append(newline[32:-25].replace(' on Hell ', ''))
+                            if length_long in newline:
+                                hoelong.append(newline[46:-35].strip(','))
+                        else:
+                            count += 1
+                            write_to.write(f'        {achiname.capitalize()}\n')
+                            write_to.write(f'{newline[27:-6]}\n')
+        if count:
+            write_to.write('\n\n')
+            write_to.write(f'miscellaneous achievements: {count}')
+            write_to.write('\n\n')
+            print('miscellaneous achievements: ', count)
+
+        normalcount = len(normallong) + len(normalshort)
+        hardcount = len(hardlong) + len(hardshort)
+        suicidecount = len(suicidelong) + len(suicideshort)
+        hoecount = len(hoelong) + len(hoeshort)
+        allcount = normalcount + hardcount + suicidecount + hoecount
+        ultraallcount = allcount + count
+        if ultraallcount == 0:
+            return 1
+        if len(normallong) or len(normalshort) > 0:
+            write_to.write(f'NORMAL DIFFICULTY\nachievements count: {normalcount}\n')
+            if normalshort:
+                write_to.write('    SHORT: \n')
+                for i in sorted(normalshort):
+                    write_to.write(f'        {i}\n')
+            if normallong:
+                write_to.write('    LONG: \n')
+                for i in sorted(normallong):
+                    write_to.write(f'        {i}\n')
+        if len(hardlong) or len(hardshort) > 0:
+            write_to.write(f'HARD DIFFICULTY\nachievements count: {hardcount}\n')
+            if hardshort:
+                write_to.write('    SHORT: \n')
+                for i in sorted(hardshort):
+                    write_to.write(f'        {i}\n')
+            if hardlong:
+                write_to.write('    LONG: \n')
+                for i in sorted(hardlong):
+                    write_to.write(f'        {i}\n')
+        if len(suicidelong) or len(suicideshort) > 0:
+            write_to.write(f'SUICIDAL DIFFICULTY\nachievements count: {suicidecount}\n')
+            if suicideshort:
+                write_to.write('    SHORT: \n')
+                for i in sorted(suicideshort):
+                    write_to.write(f'        {i}\n')
+            if suicidelong:
+                write_to.write('    LONG: \n')
+                for i in sorted(suicidelong):
+                    write_to.write(f'        {i}\n')
+        if len(hoelong) or len(hoeshort) > 0:
+            write_to.write(f'HELL ON EARTH DIFFICULTY\nachievements count: {hoecount}\n')
+            if hoeshort:
+                write_to.write('    SHORT: \n')
+                for i in sorted(hoeshort):
+                    write_to.write(f'        {i}\n')
+            if hoelong:
+                write_to.write('    LONG: \n')
+                for i in sorted(hoelong):
+                    write_to.write(f'        {i}\n')
+
+        print('mission completion achievements: ', allcount)
+        file.close()
+        print('done')
+        return 0
+
+    sg.theme('Dark')
+    layout = [
+        [sg.Text('Killing Floor commander', expand_x=True, justification='center')],
+        # [sg.Text('Killing Floor commander', expand_x=True, justification='center'),sg.Button('X',button_color='red')],
+        [sg.Text('Profile ID:'), sg.Input(key='-INPUT-')],
+        [sg.Button('Run', key='-RUN-', expand_x=True)],
+        # [sg.Output(size=(50,30))],
+        [sg.Text('', key='-OUTPUT-', expand_x=True),sg.Text('By Trollox', key='-HIM-', justification='right', enable_events=True)]
+    ]
+    window = sg.Window('KFC', layout,no_titlebar=False,grab_anywhere=True)
+
+    while True:
+        event, values = window.read()
+        match event:
+            case '-RUN-':
+                if values['-INPUT-'] != '':
+                    x = the_the(values['-INPUT-'])
+                    match x:
+                        case 0:
+                            window['-OUTPUT-'].update('Great Success!')
+                            startfile('achievements.txt')
+                        case 1:
+                            window['-OUTPUT-'].update('No user data')
+            case '-HIM-':
+                window['-INPUT-'].update('76561198123137901')
+            case 'X':
+                break
+            case sg.WIN_CLOSED:
+                break
+    window.close()
+
+
+if __name__ == '__main__':
+    main()
