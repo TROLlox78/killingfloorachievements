@@ -1,0 +1,113 @@
+import requests
+import re
+import PySimpleGUI as sg
+
+
+def fetch_achi():
+    request_achi = requests.get(f'https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=232090&key=DE8E5BFADA71FD0CD54EEC2CCB796E1E')
+    json_achi = request_achi.json()
+    return json_achi['game']['availableGameStats']['achievements']
+def fetch_player(playerID):
+    try:
+        if not playerID.isdigit():
+            pullID = requests.get(f'https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=DE8E5BFADA71FD0CD54EEC2CCB796E1E&vanityurl={playerID}')
+            playerID= pullID.json()['response']['steamid']
+
+        if playerID.isdigit():
+            request_playerinfo = requests.get(
+                f'https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v0001/?appid=232090&key=DE8E5BFADA71FD0CD54EEC2CCB796E1E&steamid={playerID}')
+            json_playerinfo = request_playerinfo.json()
+            return json_playerinfo['playerstats']['achievements']
+    except:
+        KeyError
+    return 1
+def crop(s):
+    subOne = (re.sub('Complete |Beat ', '', s))
+    subTwo = (re.sub(' on .+', '', subOne))
+    return subTwo
+
+def fetchMapList(playerinfo_list,achievement_list):
+    suicideList=[]
+    hoeList= []
+    hardList =[]
+    normalList=[]
+    collectibles=[]
+    for i in range(len(achievement_list)):
+        if playerinfo_list[i]['achieved'] == 0:         #SET TO 0 TO SEE LOCKED ACHIEVEMENTS
+            if achievement_list[i]['hidden'] != 1:
+                # NOW FOR THE GLORIOUS REGEXES
+                achi_desc = achievement_list[i]['description']
+                if len(re.findall('Complete|Beat', achi_desc)) >= 1:
+                    if len(re.findall('(any map as)|(Any One Map)', achi_desc)) != 1:
+                        # SUICIDAL
+                        if len(re.findall('(Suicidal)', achi_desc)) >= 1:
+
+                            if 'Objective' in achi_desc:
+                                suicideList.append(f'{crop(achi_desc)} Objective Mode')
+                            else:
+                                suicideList.append(crop(achi_desc))
+                        # hoe
+                        elif len(re.findall('(Hell on Earth|Hell On Earth)', achi_desc)) >= 1:
+                            if 'Objective' in achi_desc:
+                                hoeList.append(f'{crop(achi_desc)} Objective Mode')
+                            else:
+                                hoeList.append(crop(achi_desc))
+                        # hard
+                        elif len(re.findall('(Hard)', achi_desc)) >= 1:
+                            # FUCKING EDGE CASES
+                            if achi_desc == 'Complete wave 15 on Endless Hard or higher difficulty on Elysium':
+                                hardList.append('Elysium wave 15')
+                            else:
+                                if 'Objective' in achi_desc:
+                                    hardList.append(f'{crop(achi_desc)} Objective Mode')
+                                else:
+                                    hardList.append(crop(achi_desc))
+                        # normal
+                        elif len(re.findall('(Normal)', achi_desc)) >= 1:
+                            if 'Objective' in achi_desc:
+                                normalList.append(f'{crop(achi_desc)} Objective Mode')
+                            else:
+                                normalList.append(crop(achi_desc))
+                elif len(re.findall('Collect|(Find all)|Destroy',achi_desc)) >=1:
+                    collectibles.append(re.sub('^.* on |^.* in ','',achi_desc))
+    return suicideList, hoeList, hardList, normalList, collectibles
+
+
+
+def window():
+    sg.theme('Dark')
+    choices = []
+    layout = [  [sg.Text('Steam ID:'),sg.Input(key='-INPUT-'),sg.Button('Fetch',key='-FETCH-')],
+                [sg.TabGroup([[sg.Tab('Suicidal',[[sg.Listbox(choices, size=(60,10), key='-SUICIDE-')]]),
+                               sg.Tab('HoE',[[sg.Listbox(choices, size=(60,10), key='-HOE-')]]),
+                               sg.Tab('Hard',[[sg.Listbox(choices, size=(60,10), key='-HARD-')]]),
+                               sg.Tab('Normal',[[sg.Listbox(choices, size=(60,10), key='-NORMAL-')]]),
+                               sg.Tab('Collectibles',[[sg.Listbox(choices, size=(60,10), key='-COLLECTIBLES-')]]),
+                               ]])],]
+
+    window = sg.Window('Achievement Interface Display System', layout)
+
+    while True:
+        event, values = window.read()
+        if event == sg.WIN_CLOSED:
+            break
+        if event == '-FETCH-':
+            if values['-INPUT-'] !='':
+                playerID = fetch_player(values['-INPUT-'])
+                if playerID !=1:
+                    # create lists
+                    suicide, hoe, hard, normal, collectibles = fetchMapList(playerID,fetch_achi())
+
+                    # update tabs
+                    window['-SUICIDE-'].update(sorted(suicide))
+                    window['-HOE-'].update(sorted(hoe))
+                    window['-HARD-'].update(sorted(hard))
+                    window['-NORMAL-'].update(sorted(normal))
+                    window['-COLLECTIBLES-'].update(sorted(collectibles))
+                else:
+                    window['-INPUT-'].update('Username not found')
+    window.close()
+
+
+if __name__ == '__main__':
+    window()
